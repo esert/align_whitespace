@@ -1,6 +1,6 @@
 # Align Whitespace
 
-Align simple C/C++ declaration and assignment blocks around the active cursor line.
+Align C/C++ declaration, assignment, parameter, call, and macro blocks around the active cursor line.
 
 Examples:
 
@@ -28,6 +28,52 @@ becomes:
 MyStruct   foobar = {1, 2, 3};
 YourStruct bax    = {};
 HisStruct  baz    = {5};
+```
+
+```cpp
+int lerp(
+    int a,
+    int b,
+    float r,
+);
+```
+
+becomes:
+
+```cpp
+int lerp(
+    int   a,
+    int   b,
+    float r,
+);
+```
+
+```cpp
+int x = lerp(1, 2, 0.5f);
+float xx = lerp(11, 22, 1);
+```
+
+becomes:
+
+```cpp
+int   x  = lerp(1,  2,  0.5f);
+float xx = lerp(11, 22, 1   );
+```
+
+```cpp
+#define FOO(X) \
+    X(a, 1, 2) \
+    X(aa, 11, 22) \
+    X(aaa, 111, 222)
+```
+
+becomes:
+
+```cpp
+#define FOO(X)      \
+    X(a,   1,   2)  \
+    X(aa,  11,  22) \
+    X(aaa, 111, 222)
 ```
 
 ## Command
