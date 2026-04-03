@@ -88,6 +88,66 @@ def test_aligns_assignments_and_inner_call_arguments() -> None:
     )
 
 
+def test_aligns_template_scoped_assignment_targets() -> None:
+    assert_format(
+        """\
+        Array<T>::data = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+        Array<T>::count = 0;
+        capacity  = _capacity;
+        allocator = _allocator;
+        """,
+        1,
+        """\
+        Array<T>::data  = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+        Array<T>::count = 0;
+        capacity        = _capacity;
+        allocator       = _allocator;
+        """,
+    )
+
+
+def test_aligns_template_scoped_assignment_targets_from_later_cursor_line() -> None:
+    assert_format(
+        """\
+        Array<T>::data = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+        Array<T>::count = 0;
+        capacity  = _capacity;
+        allocator = _allocator;
+        """,
+        4,
+        """\
+        Array<T>::data  = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+        Array<T>::count = 0;
+        capacity        = _capacity;
+        allocator       = _allocator;
+        """,
+    )
+
+
+def test_aligns_template_scoped_assignment_targets_inside_scope() -> None:
+    assert_format(
+        """\
+        void init(Allocator* _allocator, usize _capacity = 0)
+        {
+            Array<T>::data = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+            Array<T>::count = 0;
+            capacity  = _capacity;
+            allocator = _allocator;
+        }
+        """,
+        3,
+        """\
+        void init(Allocator* _allocator, usize _capacity = 0)
+        {
+            Array<T>::data  = _capacity ? _allocator->alloc<T>(_capacity) : 0;
+            Array<T>::count = 0;
+            capacity        = _capacity;
+            allocator       = _allocator;
+        }
+        """,
+    )
+
+
 def test_aligns_only_parseable_rows_inside_a_scope() -> None:
     assert_format(
         """\

@@ -454,6 +454,15 @@ def parse_declaration(text: str) -> Declaration | None:
     if has_top_level_comma(left_expr):
         return None
 
+    if assignment is not None and not any(char.isspace() for char in left_expr):
+        return Declaration(
+            prefix="",
+            name=left_expr,
+            terminator=terminator,
+            rhs=rhs,
+            rhs_expr=parse_delimited_expr(rhs),
+        )
+
     if "(" in left_expr or ")" in left_expr:
         return None
 
@@ -609,12 +618,10 @@ def align_declarations(lines: list[ParsedLine]) -> None:
     max_prefix = max(len(line.declaration.prefix) for line in declaration_lines)
     for line in declaration_lines:
         declaration = line.declaration
-        if max_prefix == 0:
+        if max_prefix == 0 or not declaration.prefix:
             declaration.rendered_left = declaration.name
-        elif declaration.prefix:
-            declaration.rendered_left = f"{declaration.prefix.ljust(max_prefix)} {declaration.name}"
         else:
-            declaration.rendered_left = f"{' ' * (max_prefix + 1)}{declaration.name}"
+            declaration.rendered_left = f"{declaration.prefix.ljust(max_prefix)} {declaration.name}"
         line.rebuild = True
 
     assignment_lines = [line for line in declaration_lines if line.declaration.rhs is not None]
