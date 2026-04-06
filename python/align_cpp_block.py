@@ -45,6 +45,7 @@ class Declaration:
     prefix: str
     name: str
     terminator: str
+    assignment_op: str | None
     rhs: str | None
     rhs_expr: DelimitedExpr | None
     rendered_left: str | None = None
@@ -219,7 +220,10 @@ def has_top_level_comma(text: str) -> bool:
     return len(split_top_level(text, ",")) > 1
 
 
-def split_assignment(text: str) -> tuple[str, str] | None:
+ASSIGNMENT_OPERATORS = ("<<=", ">>=", "+=", "-=", "*=", "/=", "%=", "&=", "^=", "|=")
+
+
+def split_assignment(text: str) -> tuple[str, str, str] | None:
     stack: list[str] = []
     in_string = ""
     escaped = False
@@ -259,10 +263,21 @@ def split_assignment(text: str) -> tuple[str, str] | None:
 
         prev_char = text[index - 1] if index > 0 else ""
         next_char = text[index + 1] if index + 1 < len(text) else ""
-        if prev_char in "=!<>+-*/%&|^" or next_char == "=":
+        if next_char == "=":
             continue
 
-        return text[:index], text[index + 1 :]
+        for operator in ASSIGNMENT_OPERATORS:
+            start = index - len(operator) + 1
+            if start < 0:
+                continue
+            if text[start : index + 1] != operator:
+                continue
+            return text[:start], operator, text[index + 1 :]
+
+        if prev_char in "=!<>":
+            continue
+
+        return text[:index], "=", text[index + 1 :]
 
     return None
 
@@ -441,10 +456,12 @@ def parse_declaration(text: str) -> Declaration | None:
         if not terminator:
             return None
         left_expr = body.rstrip()
+        assignment_op = None
         rhs = None
     else:
         left_expr = assignment[0].rstrip()
-        rhs = assignment[1].strip()
+        assignment_op = assignment[1]
+        rhs = assignment[2].strip()
         if not rhs:
             return None
 
@@ -459,6 +476,7 @@ def parse_declaration(text: str) -> Declaration | None:
             prefix="",
             name=left_expr,
             terminator=terminator,
+            assignment_op=assignment_op,
             rhs=rhs,
             rhs_expr=parse_delimited_expr(rhs),
         )
@@ -484,6 +502,7 @@ def parse_declaration(text: str) -> Declaration | None:
         prefix=prefix,
         name=name,
         terminator=terminator,
+        assignment_op=assignment_op,
         rhs=rhs,
         rhs_expr=parse_delimited_expr(rhs) if rhs is not None else None,
     )
@@ -589,7 +608,7 @@ def build_declaration_code(declaration: Declaration) -> str:
         return f"{left}{declaration.terminator}"
 
     rhs = declaration.rendered_rhs or declaration.rhs
-    return f"{left} = {rhs}{declaration.terminator}"
+    return f"{left} {declaration.assignment_op} {rhs}{declaration.terminator}"
 
 
 def build_base_code(parsed: ParsedLine) -> str:
@@ -608,6 +627,46 @@ def render_line(parsed: ParsedLine) -> str:
         text += " " * parsed.backslash_padding
         text += "\\"
     return text + parsed.line_ending
+
+
+def alignment_family(parsed: ParsedLine | None) -> str | None:
+    if parsed is None:
+        return None
+
+    declaration = parsed.declaration
+    if declaration is not None:
+        if declaration.assignment_op is not None and not declaration.prefix:
+            return "assignment"
+        return "default"
+
+    if parsed.expr is not None:
+        return "default"
+
+    return None
+
+
+def collect_active_run(
+    parsed_lines: list[ParsedLine | None],
+    block_indexes: list[int],
+    cursor_index: int,
+) -> list[ParsedLine]:
+    if cursor_index not in block_indexes:
+        return []
+
+    cursor_pos = block_indexes.index(cursor_index)
+    family = alignment_family(parsed_lines[cursor_pos])
+    if family is None:
+        return []
+
+    start = cursor_pos
+    while start > 0 and alignment_family(parsed_lines[start - 1]) == family:
+        start -= 1
+
+    end = cursor_pos
+    while end + 1 < len(parsed_lines) and alignment_family(parsed_lines[end + 1]) == family:
+        end += 1
+
+    return [line for line in parsed_lines[start : end + 1] if line is not None]
 
 
 def align_declarations(lines: list[ParsedLine]) -> None:
@@ -629,9 +688,12 @@ def align_declarations(lines: list[ParsedLine]) -> None:
         return
 
     max_left = max(len(line.declaration.rendered_left or format_default_left(line.declaration)) for line in assignment_lines)
+    max_eq_index = max((line.declaration.assignment_op or "=").index("=") for line in assignment_lines)
     for line in assignment_lines:
         declaration = line.declaration
-        declaration.rendered_left = (declaration.rendered_left or format_default_left(declaration)).ljust(max_left)
+        eq_index = (declaration.assignment_op or "=").index("=")
+        left_width = max_left + max_eq_index - eq_index
+        declaration.rendered_left = (declaration.rendered_left or format_default_left(declaration)).ljust(left_width)
 
 
 def expr_group_key(expr: DelimitedExpr) -> tuple[str, str, str, str]:
@@ -709,17 +771,17 @@ def align_block(lines: list[str], cursor_line_number: int) -> bool:
         return False
 
     parsed_lines = [parse_line(index, lines[index]) for index in block.indexes]
-    usable_lines = [line for line in parsed_lines if line is not None]
-    if len(usable_lines) < 2:
+    active_lines = collect_active_run(parsed_lines, block.indexes, cursor_index)
+    if len(active_lines) < 2:
         return False
 
-    align_declarations(usable_lines)
-    align_delimited_exprs(usable_lines)
+    align_declarations(active_lines)
+    align_delimited_exprs(active_lines)
     if block.is_macro:
-        align_macro_backslashes(usable_lines)
+        align_macro_backslashes(active_lines)
 
     changed = False
-    for line in usable_lines:
+    for line in active_lines:
         if not line.rebuild:
             continue
         new_text = render_line(line)

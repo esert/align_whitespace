@@ -188,18 +188,155 @@ def test_aligns_scope_block_even_when_cursor_is_on_the_call_line() -> None:
     )
 
 
-def test_leaves_unparseable_rows_unchanged_while_aligning_neighbors() -> None:
+def test_does_not_align_across_inactive_rows_from_earlier_active_line() -> None:
     assert_format(
         """\
         int a = 1;
-        foo += 2;
+        foo++;
         float bb = 3;
         """,
         1,
         """\
-        int   a  = 1;
-        foo += 2;
+        int a = 1;
+        foo++;
         float bb = 3;
+        """,
+        changed=False,
+    )
+
+
+def test_aligns_only_the_contiguous_active_run_after_an_inactive_row() -> None:
+    assert_format(
+        """\
+        int a = 1;
+        foo++;
+        float bb = 3;
+        char cccc = 4;
+        """,
+        3,
+        """\
+        int a = 1;
+        foo++;
+        float bb   = 3;
+        char  cccc = 4;
+        """,
+    )
+
+
+def test_aligns_only_the_contiguous_active_run_from_later_active_line() -> None:
+    assert_format(
+        """\
+        int a = 1;
+        foo++;
+        float bb = 3;
+        char cccc = 4;
+        """,
+        4,
+        """\
+        int a = 1;
+        foo++;
+        float bb   = 3;
+        char  cccc = 4;
+        """,
+    )
+
+
+def test_cursor_on_inactive_row_does_nothing() -> None:
+    assert_format(
+        """\
+        int a = 1;
+        foo++;
+        float bb = 3;
+        char cccc = 4;
+        """,
+        2,
+        """\
+        int a = 1;
+        foo++;
+        float bb = 3;
+        char cccc = 4;
+        """,
+        changed=False,
+    )
+
+
+def test_aligns_assignment_rows_with_compound_operators() -> None:
+    assert_format(
+        """\
+        value += 1;
+        longestName = 22;
+        """,
+        1,
+        """\
+        value       += 1;
+        longestName  = 22;
+        """,
+    )
+
+
+def test_assignment_rows_are_active_together() -> None:
+    assert_format(
+        """\
+        value += 1;
+        longestName = 22;
+        third -= 333;
+        """,
+        3,
+        """\
+        value       += 1;
+        longestName  = 22;
+        third       -= 333;
+        """,
+    )
+
+
+def test_assignment_rows_do_not_align_with_declaration_rows() -> None:
+    assert_format(
+        """\
+        int a = 1;
+        long bb = 22;
+        value += 3;
+        longestName = 44;
+        """,
+        3,
+        """\
+        int a = 1;
+        long bb = 22;
+        value       += 3;
+        longestName  = 44;
+        """,
+    )
+
+
+def test_declaration_rows_do_not_cross_assignment_rows() -> None:
+    assert_format(
+        """\
+        int a = 1;
+        value += 3;
+        long bb = 22;
+        char ccc = 4;
+        """,
+        1,
+        """\
+        int a = 1;
+        value += 3;
+        long bb = 22;
+        char ccc = 4;
+        """,
+        changed=False,
+    )
+
+
+def test_declarations_and_declaration_assignments_are_active_together() -> None:
+    assert_format(
+        """\
+        int a;
+        long bb = 22;
+        """,
+        1,
+        """\
+        int  a;
+        long bb = 22;
         """,
     )
 

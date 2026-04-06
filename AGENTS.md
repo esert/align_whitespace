@@ -19,6 +19,7 @@ The formatter started as a simple declaration/assignment aligner and has been ex
 
 - declaration blocks like `int a;` / `float bb;`
 - assignment blocks like `int a = 1;`
+- compound assignment rows like `value += 1;` / `mask |= flag;`
 - function parameter rows like `int a,` / `float bb,`
 - call-like rows with inner argument-column alignment
 - macro continuation blocks for `#define ... \`
@@ -56,6 +57,20 @@ float xx = lerp(11, 22, 1   );
 ```
 
 ```cpp
+value += 1;
+longestName = 22;
+third -= 333;
+```
+
+becomes:
+
+```cpp
+value       += 1;
+longestName  = 22;
+third       -= 333;
+```
+
+```cpp
 #define FOO(X) \
     X(a, 1, 2) \
     X(aa, 11, 22) \
@@ -74,10 +89,14 @@ becomes:
 ## Important Behavior Details
 
 - Blocks are still collected by contiguous same-indent lines, except macro blocks, which are collected by `#define` plus `\` continuations.
+- Normal blocks are trimmed to the contiguous active run containing the cursor before alignment is applied.
+- Inactive rows are hard boundaries for normal blocks. If the cursor is on an inactive row, nothing should happen.
+- Assignment-only rows align together and are separate from declaration-style rows. Declaration rows and declaration-with-assignment rows are still active together.
+- Compound assignment operators align on the `=` character, so `+=`, `-=`, `|=`, etc. share the same operator column as `=`.
 - Mixed arity in delimited expressions is aligned only through shared prefix columns.
 - Delimited-expression columns are left-aligned, not numeric-right-aligned.
 - Nested commas inside strings, templates, nested calls, and braced initializers should not split outer columns.
-- Partial changes are expected: in a mixed block, parseable lines may be reformatted while non-parseable neighbors remain unchanged.
+- Partial changes are expected: only the active run containing the cursor may be reformatted, while inactive neighbors remain unchanged.
 - Blank lines and comment-only lines break normal blocks.
 - Control-flow lines like `return`, `if (...)`, `for (...)`, etc. should not be treated as declaration rows.
 
@@ -95,9 +114,12 @@ Current tests cover:
 - function parameters
 - defaulted parameters
 - assignments plus inner call argument alignment
+- compound assignment operator alignment
+- assignment-only rows staying separate from declaration-style rows
 - partial alignment inside scopes
 - cursor on different lines within the same block
-- mixed parseable/unparseable rows
+- active-run boundaries around inactive rows
+- scoped/template-qualified assignment targets
 - macro continuation alignment
 - mixed arity call/macro rows
 - nested template/initializer commas

@@ -2,7 +2,7 @@
   "name": "align-whitespace",
   "displayName": "Align Whitespace",
   "description": "Align simple C/C++ declaration blocks using a Python formatter.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "esert-local",
   "engines": {
     "vscode": "^1.74.0"
